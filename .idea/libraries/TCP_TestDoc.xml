@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="TCP_TestDoc">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/doc/TCP_TestDoc.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
