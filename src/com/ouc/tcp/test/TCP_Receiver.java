@@ -10,7 +10,7 @@ import com.ouc.tcp.message.*;
 
 
 /**
- * RDT2.2 ACK可能出错；消除NAK
+ * RDT4.2 SR
  * @author czy
  */
 public class TCP_Receiver extends TCP_Receiver_ADT {
@@ -91,7 +91,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
      */
     @Override
     public void reply(TCP_PACKET replyPack) {
-        tcpH.setTh_eflag((byte) 4); // RDT3.0: 位错+丢包
+        tcpH.setTh_eflag((byte) 7); // RDT4.2: 位错+丢包+失序
         client.send(replyPack);
     }
 

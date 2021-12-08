@@ -11,7 +11,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 
 /**
- * RDT3.0 Timer
+ * RDT4.2 SR
  *
  * @author czy
  */
@@ -82,7 +82,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
      */
     @Override
     public void udt_send(TCP_PACKET stcpPack) {
-        tcpH.setTh_eflag((byte) 4); // RDT3.0: 位错+丢包
+        tcpH.setTh_eflag((byte) 7); // RDT4.2: 位错+丢包+失序
         client.send(stcpPack);
     }
 
