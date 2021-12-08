@@ -41,7 +41,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
 
         @Override
         public void run() {
-            System.out.println("[*] Time exceeded.");
+            System.out.println("[!] Time exceeded.");
             this.senderClient.send(this.reTransPacket);
         }
     }
