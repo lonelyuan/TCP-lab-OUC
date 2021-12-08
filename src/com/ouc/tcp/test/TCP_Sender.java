@@ -8,6 +8,7 @@ import com.ouc.tcp.tool.TCP_TOOL;
 
 /**
  * RDT2.1 ACK/NACK
+ *
  * @author czy
  */
 public class TCP_Sender extends TCP_Sender_ADT {
@@ -24,8 +25,9 @@ public class TCP_Sender extends TCP_Sender_ADT {
 
     /**
      * 封装应用层数据，产生TCP数据报
+     *
      * @param dataIndex 数据序号（不是包号
-     * @param appData 应用层数据
+     * @param appData   应用层数据
      */
     @Override
     public void rdt_send(int dataIndex, int[] appData) {
@@ -39,7 +41,9 @@ public class TCP_Sender extends TCP_Sender_ADT {
     }
 
     /**
-     * 不可靠发送：通过不可靠传输信道发送；仅需修改错误标志
+     * 不可靠发送：通过不可靠传输信道发送
+     * !!仅需修改错误标志!!
+     *
      * @param stcpPack 将打包好的TCP数据报
      */
     @Override
@@ -49,17 +53,17 @@ public class TCP_Sender extends TCP_Sender_ADT {
     }
 
     /**
-     * 循环检查ackQueue
+     * 循环检查ackQueue, 收到ack则坚持是否正确
      */
     @Override
     public void waitACK() {
 //        System.out.println("[*] waiting: " + Thread.currentThread().getName());
         while (true) {
             if (!ackQueue.isEmpty()) {
-                int currentAck=ackQueue.poll();
+                int currentAck = ackQueue.poll();
                 int pack_seq = tcpPack.getTcpH().getTh_seq();
                 if (currentAck == pack_seq) {
-                    System.out.println("[+] Clear: " + pack_seq);
+                    System.out.println("[+] Finished: " + pack_seq);
                     break;
                 } else {
                     System.out.println("[+] Retransmit: " + pack_seq);
@@ -69,8 +73,13 @@ public class TCP_Sender extends TCP_Sender_ADT {
         }
     }
 
+    /**
+     * 检查校验和，将确认号插入ack队列
+     * !!不需要修改!!
+     *
+     * @param recvPack 接收到ACK报文
+     */
     @Override
-    //接收到ACK报文：检查校验和，将确认号插入ack队列;NACK的确认号为－1；不需要修改
     public void recv(TCP_PACKET recvPack) {
         ackQueue.add(recvPack.getTcpH().getTh_ack());
         System.out.println("[+] ackQueue: " + ackQueue);
