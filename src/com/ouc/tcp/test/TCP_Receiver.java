@@ -10,7 +10,7 @@ import com.ouc.tcp.message.*;
 
 
 /**
- * RDT2.1 ACK/NACK
+ * RDT2.2 ACK可能出错；消除NAK
  * @author czy
  */
 public class TCP_Receiver extends TCP_Receiver_ADT {
@@ -43,13 +43,13 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
             //将接收到的正确有序的数据插入data队列，准备交付
             if (recvPack.getTcpH().getTh_seq() != seq) {
                 dataQueue.add(recvPack.getTcpS().getData());
-                seq = recvPack.getTcpH().getTh_seq();
+                seq = recvPack.getTcpH().getTh_seq(); // update seq
             } else {
                 System.out.println("[!] seq repeated!");
             }
         } else {
             System.out.println("[!] check sum failed!");
-            tcpH.setTh_ack(-1); // NAK
+            tcpH.setTh_ack(seq); // duplicateACK
             ackPack = new TCP_PACKET(tcpH, tcpS, recvPack.getSourceAddr());
             tcpH.setTh_sum(CheckSum.computeChkSum(ackPack));
             reply(ackPack);
@@ -91,7 +91,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
      */
     @Override
     public void reply(TCP_PACKET replyPack) {
-        tcpH.setTh_eflag((byte) 0); // RDT2.0: ack 不出错
+        tcpH.setTh_eflag((byte) 1); // RDT2.2: ack 可能出错
         client.send(replyPack);
     }
 
