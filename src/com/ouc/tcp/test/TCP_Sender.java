@@ -1,6 +1,3 @@
-/***************************2.1: ACK/NACK
- **************************** Feng Hong; 2015-12-09*/
-
 package com.ouc.tcp.test;
 
 import com.ouc.tcp.client.TCP_Sender_ADT;
@@ -9,6 +6,10 @@ import com.ouc.tcp.client.UDT_Timer;
 import com.ouc.tcp.message.*;
 import com.ouc.tcp.tool.TCP_TOOL;
 
+/**
+ * RDT2.1 ACK/NACK
+ * @author czy
+ */
 public class TCP_Sender extends TCP_Sender_ADT {
 
     /**
@@ -23,7 +24,6 @@ public class TCP_Sender extends TCP_Sender_ADT {
 
     /**
      * 封装应用层数据，产生TCP数据报
-     *
      * @param dataIndex 数据序号（不是包号
      * @param appData 应用层数据
      */

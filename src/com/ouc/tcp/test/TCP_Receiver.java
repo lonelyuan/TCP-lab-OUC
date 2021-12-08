@@ -1,5 +1,3 @@
-/***************************2.1: ACK/NACK*****************/
-/***** Feng Hong; 2015-12-09******************************/
 package com.ouc.tcp.test;
 
 import java.io.BufferedWriter;
@@ -10,6 +8,11 @@ import java.io.IOException;
 import com.ouc.tcp.client.TCP_Receiver_ADT;
 import com.ouc.tcp.message.*;
 
+
+/**
+ * RDT2.1 ACK/NACK
+ * @author czy
+ */
 public class TCP_Receiver extends TCP_Receiver_ADT {
 
 	/**
@@ -32,11 +35,11 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
 		if(CheckSum.computeChkSum(recvPack) == recvPack.getTcpH().getTh_sum()) {
 			tcpH.setTh_ack(recvPack.getTcpH().getTh_seq()); //ACK
 			ackPack = new TCP_PACKET(tcpH, tcpS, recvPack.getSourceAddr());
-			tcpH.setTh_sum(CheckSum.computeChkSum(ackPack)); //回复ACK报文段
+			tcpH.setTh_sum(CheckSum.computeChkSum(ackPack));
 			reply(ackPack);
-			//将接收到的正确有序的数据插入data队列，准备交付
-  			//System.out.println("[*] seq now:" + sequence);
+  			//System.out.println("[*] seq now:" + seq);
  			//System.out.println("[*] seq recv:" + recvPack.getTcpH().getTh_seq());
+			//将接收到的正确有序的数据插入data队列，准备交付
 			if(recvPack.getTcpH().getTh_seq() != seq){
 				dataQueue.add(recvPack.getTcpS().getData());
 				seq = recvPack.getTcpH().getTh_seq();
@@ -54,10 +57,12 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
 		if(dataQueue.size() == 20) deliver_data();
 	}
 
+	/**
+	 * 交付数据（将数据写入文件）
+	 * !!不需要修改!!
+	 */
 	@Override
-	//交付数据（将数据写入文件）；不需要修改
 	public void deliver_data() {
-		//检查dataQueue，将数据写入文件
 		File fw = new File("recvData.txt");
 		BufferedWriter writer;
 		try {
@@ -66,8 +71,8 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
 			while(!dataQueue.isEmpty()) {
 				int[] data = dataQueue.poll();
 				//将数据写入文件
-				for(int i = 0; i < data.length; i++) {
-					writer.write(data[i] + "\n");
+				for (int datum : data) {
+					writer.write(datum + "\n");
 				}
 				writer.flush();		//清空输出缓存
 			}
