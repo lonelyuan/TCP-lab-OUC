@@ -1,13 +1,17 @@
 package com.ouc.tcp.test;
 
+import com.ouc.tcp.client.Client;
 import com.ouc.tcp.client.TCP_Sender_ADT;
 import com.ouc.tcp.client.UDT_RetransTask;
 import com.ouc.tcp.client.UDT_Timer;
 import com.ouc.tcp.message.*;
 import com.ouc.tcp.tool.TCP_TOOL;
 
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+
 /**
- * RDT2.1 ACK/NACK
+ * RDT3.0 Timer
  *
  * @author czy
  */
@@ -17,6 +21,30 @@ public class TCP_Sender extends TCP_Sender_ADT {
      * 待发送的TCP数据报
      */
     private TCP_PACKET tcpPack;
+    /**
+     * 检测丢包的定时器
+     */
+    private UDT_Timer timer;
+
+    /**
+     * 重写定时器任务以打印超时事件
+     */
+    static class RetransTask extends UDT_RetransTask{
+        private final Client senderClient;
+        private final TCP_PACKET reTransPacket;
+
+        public RetransTask(Client client, TCP_PACKET packet) {
+            super(client, packet);
+            this.senderClient = client;
+            this.reTransPacket = packet;
+        }
+
+        @Override
+        public void run() {
+            System.out.println("[*] Time exceeded.");
+            this.senderClient.send(this.reTransPacket);
+        }
+    }
 
     public TCP_Sender() {
         super();
@@ -37,6 +65,12 @@ public class TCP_Sender extends TCP_Sender_ADT {
         tcpH.setTh_sum(CheckSum.computeChkSum(tcpPack));
         tcpPack.setTcpH(tcpH);
         udt_send(tcpPack);
+
+        //RDT3.0 设置定时器任务，非阻塞
+        timer = new UDT_Timer();
+        RetransTask reTrans = new RetransTask(client, tcpPack);
+        timer.schedule(reTrans,3000,3000);
+
         waitACK();
     }
 
@@ -48,22 +82,23 @@ public class TCP_Sender extends TCP_Sender_ADT {
      */
     @Override
     public void udt_send(TCP_PACKET stcpPack) {
-        tcpH.setTh_eflag((byte) 1);
+        tcpH.setTh_eflag((byte) 4); // RDT3.0: 位错+丢包
         client.send(stcpPack);
     }
 
     /**
-     * 循环检查ackQueue, 收到ack则坚持是否正确
+     * 循环检查ackQueue, 收到ACK则检查是否正确，正确则退出循环，错误则重传
      */
     @Override
     public void waitACK() {
-//        System.out.println("[*] waiting: " + Thread.currentThread().getName());
         while (true) {
             if (!ackQueue.isEmpty()) {
                 int currentAck = ackQueue.poll();
                 int pack_seq = tcpPack.getTcpH().getTh_seq();
                 if (currentAck == pack_seq) {
                     System.out.println("[+] Finished: " + pack_seq);
+                    //RDT3.0 定时器撤销
+                    timer.cancel();
                     break;
                 } else {
                     System.out.println("[+] Retransmit: " + pack_seq);
@@ -82,6 +117,6 @@ public class TCP_Sender extends TCP_Sender_ADT {
     @Override
     public void recv(TCP_PACKET recvPack) {
         ackQueue.add(recvPack.getTcpH().getTh_ack());
-        System.out.println("[+] ackQueue: " + ackQueue);
+//        System.out.println("[+] ackQueue: " + ackQueue);
     }
 }

@@ -91,7 +91,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
      */
     @Override
     public void reply(TCP_PACKET replyPack) {
-        tcpH.setTh_eflag((byte) 1); // RDT2.2: ack 可能出错
+        tcpH.setTh_eflag((byte) 4); // RDT3.0: 位错+丢包
         client.send(replyPack);
     }
 
