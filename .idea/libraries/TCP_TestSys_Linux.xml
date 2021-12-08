@@ -6,6 +6,7 @@
     <JAVADOC />
     <SOURCES>
       <root url="jar://$PROJECT_DIR$/lib/TCP_TestSys_Linux.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/TCP_TestSys_Linux.jar!/" />
     </SOURCES>
   </library>
 </component>
