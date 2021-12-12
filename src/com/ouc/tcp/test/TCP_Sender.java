@@ -3,14 +3,10 @@ package com.ouc.tcp.test;
 import com.ouc.tcp.client.TCP_Sender_ADT;
 import com.ouc.tcp.message.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.*;
 
 /**
- * RDT4.2 SR
+ * RDT4.3 TCP
  *
  * @author czy
  */
@@ -19,16 +15,18 @@ public class TCP_Sender extends TCP_Sender_ADT {
     private int N = 10; // 窗口容量
     private int sendBase = 1; // 窗口指针
     private final List<WindowItem> sendWindow; // 发送窗口
+    private int unACKedHead; // 第一个未应答包序号
+    private int rtt; // 估计的RTT
+
 
     /**
      * 发送窗口中的一项
      */
     static class WindowItem {
         private final TCP_PACKET tcpPack; // TCP报文段
-        private final int pakSeq; // 包序号
-        public Timer timer; // 计时器
+        //        public Timer timer; // 计时器
         private int reTransCnt; // 重传计数器
-        private final int dupACKCnt; // 冗余ACK计数器
+        private int dupACKCnt; // 冗余ACK计数器
         /**
          * 包状态
          * 可用未发送:1 | 发送未确认:2 | 已确认:3 | 不可用:0
@@ -36,20 +34,31 @@ public class TCP_Sender extends TCP_Sender_ADT {
         private int pakStat;
 
         WindowItem(TCP_PACKET pak) {
-            tcpPack = pak;
+            TCP_PACKET P = null;
+            try {
+                P = pak.clone();
+            } catch (CloneNotSupportedException e) {
+                e.printStackTrace();
+            }
+            tcpPack = P;
             pakStat = 2; // 刚加入的包为发送未确认
-            timer = new Timer();
-            pakSeq = pak.getTcpH().getTh_seq();
+//            timer = new Timer();
             reTransCnt = 0;
             dupACKCnt = 0;
         }
 
-        public int get_seq() {
-            return this.tcpPack.getTcpH().getTh_seq();
+        @Override
+        public String toString() {
+            return "I{" +
+                    " Seq=" + Seq() +
+                    ", reTransCnt=" + reTransCnt +
+                    ", dupACKCnt=" + dupACKCnt +
+                    ", pakStat=" + pakStat +
+                    '}';
         }
 
-        public void set_stat(int stat) {
-            this.pakStat = stat;
+        private int Seq() {
+            return tcpPack.getTcpH().getTh_seq();
         }
     }
 
@@ -59,6 +68,24 @@ public class TCP_Sender extends TCP_Sender_ADT {
         super.initTCP_Sender(this);
         //RDT4.2 初始化窗口
         sendWindow = new ArrayList<>();
+        unACKedHead = -1;
+        // 单一重传计时器
+        Timer t = new Timer();
+        t.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if (unACKedHead != -1) {
+                    for (WindowItem I : sendWindow) {
+                        if (I.Seq() == unACKedHead) {
+                            System.out.println("{S}[!] Retransmit " + unACKedHead);
+                            I.reTransCnt++;
+                            udt_send(I.tcpPack);
+                            break;
+                        }
+                    }
+                }
+            }
+        }, 10, 10); // 0.01秒后重传
 //        mainLoop();
     }
 
@@ -80,12 +107,12 @@ public class TCP_Sender extends TCP_Sender_ADT {
 //                    } else if (I.pakStat == 2) { // 未应答，准备重传
 //                        checkACK(I);
 //                        if (++I.reTransCnt % 5 == 0) { // 重传间隔略大于0.01*N
-//                            System.out.println("{S}[!] Retransmit " + I.pakSeq);
+//                            System.out.println("{S}[!] Retransmit " + I.Seq());
 //                            udt_send(I.tcpPack);
 //                        }
 //                    } else if (I.pakStat == 3) { // 有序，期待下一个包
-//                        if (I.pakSeq == expSeq && order) {
-//                            expSeq = I.pakSeq + I.tcpPack.getTcpS().getDataLengthInByte() / 4;
+//                        if (I.Seq() == expSeq && order) {
+//                            expSeq = I.Seq() + I.tcpPack.getTcpS().getDataLengthInByte() / 4;
 //                            orderNum += 1;
 //                            System.out.println("{S}[*] orderNum " + orderNum + " expSeq " + expSeq);
 //                        } else { // 失序，不再检查后续的包
@@ -104,42 +131,6 @@ public class TCP_Sender extends TCP_Sender_ADT {
 //        mainTimer.schedule(checkWindow, 0, 10); // 每0.01秒检查一次窗口
 //    }
 
-//    /**
-//     * 检查ACK
-//     *
-//     * @param I 未确认的包
-//     */
-//    private void checkACK(WindowItem I) {
-//        for (int i : ackQueue) {
-//            if (I.pakSeq == i) {
-//                I.pakStat = 3;
-//                break;
-//            }
-//        }
-//    }
-
-    /**
-     * 发送包并配置独立计时器
-     *
-     * @param I 窗口项
-     */
-    private synchronized void sendPack(WindowItem I) {
-        TCP_PACKET tcpPack = I.tcpPack;
-        udt_send(tcpPack);
-        I.pakStat = 2;
-        I.timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                if (I.pakStat == 2) {
-                    System.out.println("{S}[!] Retransmit " + I.pakSeq);
-                    udt_send(tcpPack);
-                } else if (I.pakStat == 3) {
-                    System.gc();
-                    cancel();
-                }
-            }
-        }, 10, 10); // 0.01秒后重传
-    }
 
     /**
      * 展示窗口状态
@@ -153,13 +144,13 @@ public class TCP_Sender extends TCP_Sender_ADT {
         for (WindowItem I : sendWindow) {
             switch (I.pakStat) {
                 case 1:
-                    System.out.print("○" + I.pakSeq);
+                    System.out.print("○" + I.Seq());
                     break;
                 case 2:
-                    System.out.print("◐" + I.pakSeq);
+                    System.out.print("◐" + I.Seq());
                     break;
                 case 3:
-                    System.out.print("◉" + I.pakSeq);
+                    System.out.print("◉" + I.Seq());
                     break;
             }
 
@@ -185,7 +176,8 @@ public class TCP_Sender extends TCP_Sender_ADT {
         tcpPack.setTcpH(tcpH);
         //RDT4.2 送入发送窗口
         WindowItem I = new WindowItem(tcpPack);
-        sendPack(I);
+//        sendPack(I);
+        udt_send(tcpPack);
         sendWindow.add(I);
         System.out.println("{S}[+] Add to Window");
         printWindow();
@@ -193,7 +185,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
 
     /**
      * --*应用层接口*--
-     * 收到ACK，驱动窗口移动
+     * 更新ACK状态，更新待重发项，驱动窗口移动
      *
      * @param recvPack 发送方只接收到ACK报文
      */
@@ -201,31 +193,44 @@ public class TCP_Sender extends TCP_Sender_ADT {
     public void recv(TCP_PACKET recvPack) {
         int ackSeq = recvPack.getTcpH().getTh_ack();
         System.out.println("{S}[+] received ACK:" + ackSeq);
-        boolean order = true; // 是否有序
-        int orderNum = 0; // 可释放包数量
-        int expSeq = sendBase; // 期望的包号
+        // 第一循环 应答报文
         for (WindowItem I : sendWindow) {
-            if (I.pakStat == 2) { // 应答
-                if (I.get_seq() == ackSeq) {
-                    I.set_stat(3);
-                }
-            } else if (I.pakStat == 3) { // 有序，期待下一个包
-                if (I.pakSeq == expSeq && order) {
-                    expSeq = I.pakSeq + I.tcpPack.getTcpS().getDataLengthInByte() / 4;
-                    orderNum += 1;
-//                    System.out.println("{S}[*] orderNum " + orderNum + " expSeq " + expSeq);
-                } else { // 失序，不再检查后续的包
-                    order = false;
+            if (I.Seq() == ackSeq) { // 找到对应报文
+                if (I.pakStat == 2){ // 首次应答
+                    I.pakStat = 3;
+                    System.out.println("{S}[+] marked: " + I.Seq());
+                    break;
+                }else { // 冗余ACK
+                    I.dupACKCnt++;
                 }
             }
         }
+        // 第二循环 检查窗口有序段，直到第一个未应答
+        int orderNum = 0; // 可释放包数量
+        int expSeq = sendBase; // 期望的包号
+        for (WindowItem I : sendWindow) {
+            if (I.pakStat == 3 && I.Seq() == expSeq) { // 有序到达，准备推动窗口 （假定待发送包按序到达）
+                expSeq = I.Seq() + I.tcpPack.getTcpS().getDataLengthInByte() / 4;
+                orderNum++;
+            } else {// 未到达，准备重传，不再检查后续的包
+                unACKedHead = I.Seq();
+//            if (I.Seq() != I.tcpPack.getTcpH().getTh_seq()){
+//                    System.out.println("{S}[!] wsnd: " + I + " " + I.tcpPack.getTcpH().getTh_seq());
+//                }
+                break;
+            }
+        }
+        // 第三循环 更新窗口
         if (orderNum > 0) { // 更新窗口
             System.out.println("{S}[*] Free " + orderNum);
-            sendWindow.subList(0, orderNum).clear();
-            sendBase = expSeq;
+            WindowItem I = sendWindow.get(orderNum - 1);
+            sendBase = I.Seq() + I.tcpPack.getTcpS().getDataLengthInByte() / 4;
+            while (orderNum > 0) {
+                sendWindow.remove(0);
+                orderNum--;
+            }
             printWindow();
         }
-
     }
 
 

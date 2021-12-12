@@ -128,11 +128,12 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
     @Override
     public synchronized void rdt_recv(TCP_PACKET recvPack) {
         int recvSeq = recvPack.getTcpH().getTh_seq();
+        System.out.println("{R}[+] received data:" + recvSeq);
         //RDT4.2 判断窗口
         if (CheckSum.computeChkSum(recvPack) == recvPack.getTcpH().getTh_sum()) {
             sendACK(recvSeq, recvPack);
             if (recvSeq < recvBase) { // [recvBase - N, recvBse - 1] 窗口前，重发ACK
-                System.out.println("{R}[*] duplicate ACK");
+                System.out.println("{R}[*] duplicate ACK" + recvSeq);
             } else if (recvSeq == recvBase) { // 按序到达，推动窗口
                 System.out.println("{R}[*] Push Window");
                 recvWindow.add(new WindowItem(recvPack));
