@@ -25,29 +25,18 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
      * 发送窗口中的一项
      */
     class WindowItem {
-        /**
-         * TCP报文段
-         */
-        private final TCP_PACKET tcpPack;
-        /**
-         * 包序号
-         */
-        private final int pakSeq;
+        private final TCP_PACKET tcpPack; // TCP报文段
+        private final int pakSeq; // 包序号
         /**
          * 包状态
          * 期待未收到:1|失序未确认:2|已确认:3|不可用:0
          */
         private int pakStat;
-        /**
-         * 独立计时器
-         */
-        private Timer timer;
 
         WindowItem(TCP_PACKET pak) {
             tcpPack = pak;
             pakStat = 2; // 刚加入的包默认为失序未确认态
             pakSeq = pak.getTcpH().getTh_seq();
-            timer = new Timer();
         }
 
         public int dataLen() {
@@ -87,7 +76,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
         if (recvWindow.isEmpty()) {
             return;
         }
-        System.out.println("---- RecvWindow ----");
+        System.out.println("------ RecvWindow ------");
         for (WindowItem I : recvWindow) {
             switch (I.pakStat) {
                 case 1:
@@ -100,9 +89,8 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
                     System.out.print("◉" + I.pakSeq);
                     break;
             }
-
         }
-        System.out.printf("\n---- base:%05d ----\n", recvBase);
+        System.out.printf("\n---- RecvBase:%05d ----\n", recvBase);
     }
 
     /**
@@ -111,17 +99,18 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
     private synchronized void updateWindow() {
         WindowItem I;
         boolean ordered = true;
+        int n = 0;
         while (ordered && !recvWindow.isEmpty()) {
             I = recvWindow.first();
-            System.out.println("{R}[+] first " + I.pakSeq + " Base " + recvBase);
+//            System.out.println("{R}[+] first " + I.pakSeq + " Base " + recvBase);
             if (I.pakSeq == recvBase) { // 下一个块有序
                 dataQueue.add(I.tcpPack.getTcpS().getData());
                 recvBase += I.dataLen();
                 recvWindow.remove(I);
-                System.out.println("{R}[+] Base " + recvBase);
+                n++;
             } else {
                 ordered = false;
-                System.out.println("{R}[+] Uptade Window");
+                System.out.println("{R}[*] Free " + n);
                 printWindow();
             }
         }
@@ -143,11 +132,13 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
         if (CheckSum.computeChkSum(recvPack) == recvPack.getTcpH().getTh_sum()) {
             sendACK(recvSeq, recvPack);
             if (recvSeq < recvBase) { // [recvBase - N, recvBse - 1] 窗口前，重发ACK
-                System.out.println("{R}[+] duplicate ACK");
+                System.out.println("{R}[*] duplicate ACK");
             } else if (recvSeq == recvBase) { // 按序到达，推动窗口
+                System.out.println("{R}[*] Push Window");
                 recvWindow.add(new WindowItem(recvPack));
                 updateWindow();
             } else { // [recvBase, recvBse + N] 窗口内，缓存之
+                sendACK(recvSeq, recvPack);
                 recvWindow.add(new WindowItem(recvPack));
                 System.out.println("{R}[+] Add to Window");
                 printWindow();
