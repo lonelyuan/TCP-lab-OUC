@@ -5,6 +5,8 @@ import com.ouc.tcp.message.*;
 
 import java.util.*;
 
+import static java.lang.Math.abs;
+
 /**
  * RDT4.3 TCP
  *
@@ -16,7 +18,12 @@ public class TCP_Sender extends TCP_Sender_ADT {
     private int sendBase = 1; // 窗口指针
     private final List<WindowItem> sendWindow; // 发送窗口
     private int unACKedHead; // 第一个未应答包序号
-    private int rtt; // 估计的RTT
+
+    private long iRTT = 1; // 超时时延 单位：ms
+    private long eRTT = 1; // RTT估计 单位：ms
+    private long dRTT = 1; // RTT波动 单位：ms
+    private final float alpha = 0.125F; // 指数移动平均 的加权α
+    private final float beta = 0.25F; // 指数移动平均 的加权β
 
 
     /**
@@ -24,7 +31,8 @@ public class TCP_Sender extends TCP_Sender_ADT {
      */
     static class WindowItem {
         private final TCP_PACKET tcpPack; // TCP报文段
-        //        public Timer timer; // 计时器
+        private long start; // 开始时间
+        //        public Timer timer; // RDT4.2 计时器
         private int reTransCnt; // 重传计数器
         private int dupACKCnt; // 冗余ACK计数器
         /**
@@ -69,7 +77,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
         //RDT4.2 初始化窗口
         sendWindow = new ArrayList<>();
         unACKedHead = -1;
-        // 单一重传计时器
+        //RDT4.3 单一重传计时器
         Timer t = new Timer();
         t.schedule(new TimerTask() {
             @Override
@@ -85,7 +93,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
                     }
                 }
             }
-        }, 10, 10); // 0.01秒后重传
+        }, iRTT, iRTT);
 //        mainLoop();
     }
 
@@ -176,8 +184,9 @@ public class TCP_Sender extends TCP_Sender_ADT {
         tcpPack.setTcpH(tcpH);
         //RDT4.2 送入发送窗口
         WindowItem I = new WindowItem(tcpPack);
-//        sendPack(I);
         udt_send(tcpPack);
+        //RDT4.3 RTT
+        I.start = System.currentTimeMillis();
         sendWindow.add(I);
         System.out.println("{S}[+] Add to Window");
         printWindow();
@@ -185,7 +194,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
 
     /**
      * --*应用层接口*--
-     * 更新ACK状态，更新待重发项，驱动窗口移动
+     * RDT4.2 更新ACK状态，更新待重发项，驱动窗口移动
      *
      * @param recvPack 发送方只接收到ACK报文
      */
@@ -196,11 +205,16 @@ public class TCP_Sender extends TCP_Sender_ADT {
         // 第一循环 应答报文
         for (WindowItem I : sendWindow) {
             if (I.Seq() == ackSeq) { // 找到对应报文
-                if (I.pakStat == 2){ // 首次应答
+                if (I.pakStat == 2) { // 首次应答
                     I.pakStat = 3;
-                    System.out.println("{S}[+] marked: " + I.Seq());
+                    // RDT4.3 更新RTT
+                    long RTT = System.currentTimeMillis() - I.start;
+                    eRTT = (long) ((float) eRTT * (1 - alpha) + (float) RTT * alpha);
+                    dRTT = (long) ((float) dRTT * (1 - beta) + (float) abs(RTT - eRTT) * beta);
+                    iRTT = 2 * eRTT + dRTT; // 四倍太长
+                    System.out.println("{S}[+] marked: " + I.Seq() + " iRTT: " + iRTT);
                     break;
-                }else { // 冗余ACK
+                } else { // 冗余ACK
                     I.dupACKCnt++;
                 }
             }
@@ -214,9 +228,6 @@ public class TCP_Sender extends TCP_Sender_ADT {
                 orderNum++;
             } else {// 未到达，准备重传，不再检查后续的包
                 unACKedHead = I.Seq();
-//            if (I.Seq() != I.tcpPack.getTcpH().getTh_seq()){
-//                    System.out.println("{S}[!] wsnd: " + I + " " + I.tcpPack.getTcpH().getTh_seq());
-//                }
                 break;
             }
         }
