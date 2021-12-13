@@ -253,7 +253,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
      */
     @Override
     public void udt_send(TCP_PACKET Packet) {
-        tcpH.setTh_eflag((byte) 3); // RDT4.2: 位错+丢包+失序
+        tcpH.setTh_eflag((byte) 7); // RDT4.2: 位错+丢包+失序
         client.send(Packet);
     }
 
