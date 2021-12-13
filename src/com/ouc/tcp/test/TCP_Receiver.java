@@ -128,27 +128,25 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
     @Override
     public synchronized void rdt_recv(TCP_PACKET recvPack) {
         int recvSeq = recvPack.getTcpH().getTh_seq();
-        System.out.println("{R}[+] received data:" + recvSeq);
+        System.out.println("{R}[+] received data:" + recvSeq + " Base " + recvBase);
         //RDT4.2 判断窗口
-        if (CheckSum.computeChkSum(recvPack) == recvPack.getTcpH().getTh_sum()) {
-            sendACK(recvSeq, recvPack);
-            if (recvSeq < recvBase) { // [recvBase - N, recvBse - 1] 窗口前，重发ACK
-                System.out.println("{R}[*] duplicate ACK" + recvSeq);
-            } else if (recvSeq == recvBase) { // 按序到达，推动窗口
-                System.out.println("{R}[*] Push Window");
-                recvWindow.add(new WindowItem(recvPack));
-                updateWindow();
-            } else { // [recvBase, recvBse + N] 窗口内，缓存之
-                sendACK(recvSeq, recvPack);
-                recvWindow.add(new WindowItem(recvPack));
-                System.out.println("{R}[+] Add to Window");
-                printWindow();
-            }
-//            else { // 丢弃
-//                System.out.println("[!] dropped " + recvSeq);
-//            }
-        } else {
+        if (CheckSum.computeChkSum(recvPack) != recvPack.getTcpH().getTh_sum()) { // 校验
             System.out.println("{R}[!] check sum failed!");
+            return;
+        }
+        if (recvSeq < recvBase) { // [recvBase - N, recvBse - 1] 窗口前，重发ACK
+            sendACK(recvSeq, recvPack);
+            System.out.println("{R}[*] duplicate ACK" + recvSeq);
+        } else if (recvSeq == recvBase) { // 按序到达，推动窗口
+            sendACK(recvSeq, recvPack);
+            System.out.println("{R}[*] Push Window");
+            recvWindow.add(new WindowItem(recvPack));
+            updateWindow();
+        } else { // [recvBase, recvBse + N] 窗口内，缓存之
+            sendACK(recvSeq, recvPack); // TODO：冗余ACK
+            recvWindow.add(new WindowItem(recvPack));
+            System.out.println("{R}[+] Add to Window");
+            printWindow();
         }
     }
 

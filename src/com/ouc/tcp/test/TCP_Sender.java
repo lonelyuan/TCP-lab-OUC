@@ -22,8 +22,6 @@ public class TCP_Sender extends TCP_Sender_ADT {
     private long iRTT = 1; // 超时时延 单位：ms
     private long eRTT = 1; // RTT估计 单位：ms
     private long dRTT = 1; // RTT波动 单位：ms
-    private final float alpha = 0.125F; // 指数移动平均 的加权α
-    private final float beta = 0.25F; // 指数移动平均 的加权β
 
 
     /**
@@ -32,7 +30,6 @@ public class TCP_Sender extends TCP_Sender_ADT {
     static class WindowItem {
         private final TCP_PACKET tcpPack; // TCP报文段
         private long start; // 开始时间
-        //        public Timer timer; // RDT4.2 计时器
         private int reTransCnt; // 重传计数器
         private int dupACKCnt; // 冗余ACK计数器
         /**
@@ -93,7 +90,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
                     }
                 }
             }
-        }, iRTT, iRTT);
+        }, iRTT, iRTT); // ???
 //        mainLoop();
     }
 
@@ -204,18 +201,19 @@ public class TCP_Sender extends TCP_Sender_ADT {
         System.out.println("{S}[+] received ACK:" + ackSeq);
         // 第一循环 应答报文
         for (WindowItem I : sendWindow) {
-            if (I.Seq() == ackSeq) { // 找到对应报文
-                if (I.pakStat == 2) { // 首次应答
+            if (I.Seq() > ackSeq) { // RDT4.3 累计确认
+                break;
+            } else {
+                if (I.pakStat == 2 && I.Seq() == ackSeq) { // 首次应答
                     I.pakStat = 3;
                     // RDT4.3 更新RTT
-                    long RTT = System.currentTimeMillis() - I.start;
-                    eRTT = (long) ((float) eRTT * (1 - alpha) + (float) RTT * alpha);
-                    dRTT = (long) ((float) dRTT * (1 - beta) + (float) abs(RTT - eRTT) * beta);
-                    iRTT = 2 * eRTT + dRTT; // 四倍太长
+                    calcRTT(System.currentTimeMillis() - I.start);
                     System.out.println("{S}[+] marked: " + I.Seq() + " iRTT: " + iRTT);
-                    break;
-                } else { // 冗余ACK
+                } else if (I.Seq() == ackSeq) { //冗余ACK
                     I.dupACKCnt++;
+                    if (I.dupACKCnt >= 2) { //RDT4.3 快重传
+                        udt_send(I.tcpPack);
+                    }
                 }
             }
         }
@@ -224,7 +222,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
         int expSeq = sendBase; // 期望的包号
         for (WindowItem I : sendWindow) {
             if (I.pakStat == 3 && I.Seq() == expSeq) { // 有序到达，准备推动窗口 （假定待发送包按序到达）
-                expSeq = I.Seq() + I.tcpPack.getTcpS().getDataLengthInByte() / 4;
+                expSeq = getExpSeq(I);
                 orderNum++;
             } else {// 未到达，准备重传，不再检查后续的包
                 unACKedHead = I.Seq();
@@ -235,13 +233,41 @@ public class TCP_Sender extends TCP_Sender_ADT {
         if (orderNum > 0) { // 更新窗口
             System.out.println("{S}[*] Free " + orderNum);
             WindowItem I = sendWindow.get(orderNum - 1);
-            sendBase = I.Seq() + I.tcpPack.getTcpS().getDataLengthInByte() / 4;
+            sendBase = getExpSeq(I);
             while (orderNum > 0) {
                 sendWindow.remove(0);
                 orderNum--;
             }
             printWindow();
         }
+    }
+
+    /**
+     * 计算下一个期待的包号
+     *
+     * @param I 当前包
+     * @return 下一个有序包号
+     */
+    private int getExpSeq(WindowItem I) {
+        if (I.Seq() != I.tcpPack.getTcpH().getTh_seq()){
+            System.out.println("{S}[!] Error!");
+        }
+        return I.Seq() + I.tcpPack.getTcpS().getDataLengthInByte() / 4;
+    }
+
+    /**
+     * 更新RTT
+     *
+     * @param RTT 本轮RTT
+     */
+    private void calcRTT(long RTT) {
+        // 指数移动平均 的加权α
+        float alpha = 0.125F;
+        eRTT = (long) ((float) eRTT * (1 - alpha) + (float) RTT * alpha);
+        // 指数移动平均 的加权β
+        float beta = 0.25F;
+        dRTT = (long) ((float) dRTT * (1 - beta) + (float) abs(RTT - eRTT) * beta);
+        iRTT = 2 * eRTT + dRTT; // 四倍太长
     }
 
 
