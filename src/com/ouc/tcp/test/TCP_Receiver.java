@@ -11,20 +11,19 @@ import com.ouc.tcp.message.*;
 
 
 /**
- * RDT4.2 SR
+ * RDT4.3 TCP
  *
  * @author czy
  */
 public class TCP_Receiver extends TCP_Receiver_ADT {
 
-    private final int N = 10; // 窗口容量
     private int recvBase = 1; // 窗口指针
-    private SortedSet<WindowItem> recvWindow; // 发送窗口
+    private final SortedSet<WindowItem> recvWindow; // 发送窗口
 
     /**
-     * 发送窗口中的一项
+     * RDT4.2 发送窗口项
      */
-    class WindowItem {
+    static class WindowItem {
         private final TCP_PACKET tcpPack; // TCP报文段
         private final int pakSeq; // 包序号
         /**
@@ -38,6 +37,17 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
             pakStat = 2; // 刚加入的包默认为失序未确认态
             pakSeq = pak.getTcpH().getTh_seq();
         }
+        @Override
+        public String toString() {
+            return "I{" +
+                    " Seq=" + Seq() +
+                    ", pakStat=" + pakStat +
+                    '}';
+        }
+
+        private int Seq() {
+            return tcpPack.getTcpH().getTh_seq();
+        }
 
         public int dataLen() {
             return this.tcpPack.getTcpS().getDataLengthInByte() / 4;
@@ -48,11 +58,40 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
         super();
         super.initTCP_Receiver(this);
         //RDT4.2 初始化窗口
-        // 数据结构：红黑树
         recvWindow = new TreeSet<>(Comparator.comparingInt(o -> o.tcpPack.getTcpH().getTh_seq()));
     }
 
 
+    /**
+     * --*应用层接口*--
+     * 生成ACK，交付数据
+     *
+     * @param recvPack 收到的包
+     */
+    @Override
+    public synchronized void rdt_recv(TCP_PACKET recvPack) {
+        int recvSeq = recvPack.getTcpH().getTh_seq();
+        System.out.println("{R}[+] received data:" + recvSeq + " Base " + recvBase);
+        if (checkPak(recvPack)) return; // 校验包
+        // [recvBase - N, recvBse - 1] 窗口前，重发ACK
+        if (recvSeq < recvBase) {
+            sendACK(recvSeq, recvPack);
+            System.out.println("{R}[*] duplicate ACK" + recvSeq);
+            return;
+        }
+        // [recvBase, recvBse + N] 窗口内，缓存之
+        recvWindow.add(new WindowItem(recvPack));
+        // RDT4.3 累计确认
+        updateWindow(recvPack);
+    }
+
+    private boolean checkPak(TCP_PACKET recvPack) {
+        if (CheckSum.computeChkSum(recvPack) != recvPack.getTcpH().getTh_sum()) { // 校验
+            System.out.println("{R}[!] check sum failed!");
+            return true;
+        }
+        return false;
+    }
     /**
      * 生成ACK报文并返回
      *
@@ -73,80 +112,49 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
      * ◉|已确认   |3
      */
     public synchronized void printWindow() {
-        if (recvWindow.isEmpty()) {
-            return;
-        }
-        System.out.println("------ RecvWindow ------");
+        if (recvWindow.size() == 0) return;
+        StringBuilder sb = new StringBuilder().append("------ {recvWindow} ------\n");
+        sb.append("-- Base: ").append(recvBase);
         for (WindowItem I : recvWindow) {
             switch (I.pakStat) {
                 case 1:
-                    System.out.print("◎" + I.pakSeq);
+                    sb.append("◎").append(I.Seq());
                     break;
                 case 2:
-                    System.out.print("◑" + I.pakSeq);
+                    sb.append("◑").append(I.Seq());
                     break;
                 case 3:
-                    System.out.print("◉" + I.pakSeq);
+                    sb.append("◉").append(I.Seq());
                     break;
             }
         }
-        System.out.printf("\n---- RecvBase:%05d ----\n", recvBase);
+        sb.append("\n------------------------\n");
+        System.out.println(sb);
     }
 
     /**
-     * 检查窗口的有序部分，交付数据
+     * 检查窗口有序部分，交付数据
      */
-    private synchronized void updateWindow() {
-        WindowItem I;
-        boolean ordered = true;
-        int n = 0;
-        while (ordered && !recvWindow.isEmpty()) {
-            I = recvWindow.first();
-//            System.out.println("{R}[+] first " + I.pakSeq + " Base " + recvBase);
-            if (I.pakSeq == recvBase) { // 下一个块有序
+    private synchronized void updateWindow(TCP_PACKET recvPack) {
+        int expSeq = recvBase; // 下一个期待的包
+        while (!recvWindow.isEmpty()) {
+            WindowItem I = recvWindow.first();
+            // System.out.println("{R}[+] first " + I.pakSeq + " Base " + recvBase);
+            if (I.pakSeq == expSeq) { // 下一个块有序
+                I.pakStat = 3;
                 dataQueue.add(I.tcpPack.getTcpS().getData());
-                recvBase += I.dataLen();
                 recvWindow.remove(I);
-                n++;
+                expSeq++;
             } else {
-                ordered = false;
-                System.out.println("{R}[*] Free " + n);
-                printWindow();
+                break;
             }
         }
+        System.out.println("{R}[*] Free " + (expSeq - recvBase));
+        recvBase = expSeq;
+        printWindow();
+        sendACK(recvBase - 1, recvPack); // 累计确认
         if (dataQueue.size() == 20) {
             deliver_data();
-        }
-    }
-
-    /**
-     * --*应用层接口*--
-     * 生成ACK，交付数据
-     *
-     * @param recvPack 收到的包
-     */
-    @Override
-    public synchronized void rdt_recv(TCP_PACKET recvPack) {
-        int recvSeq = recvPack.getTcpH().getTh_seq();
-        System.out.println("{R}[+] received data:" + recvSeq + " Base " + recvBase);
-        //RDT4.2 判断窗口
-        if (CheckSum.computeChkSum(recvPack) != recvPack.getTcpH().getTh_sum()) { // 校验
-            System.out.println("{R}[!] check sum failed!");
-            return;
-        }
-        if (recvSeq < recvBase) { // [recvBase - N, recvBse - 1] 窗口前，重发ACK
-            sendACK(recvSeq, recvPack);
-            System.out.println("{R}[*] duplicate ACK" + recvSeq);
-        } else if (recvSeq == recvBase) { // 按序到达，推动窗口
-            sendACK(recvSeq, recvPack);
-            System.out.println("{R}[*] Push Window");
-            recvWindow.add(new WindowItem(recvPack));
-            updateWindow();
-        } else { // [recvBase, recvBse + N] 窗口内，缓存之
-            sendACK(recvSeq, recvPack); // TODO：冗余ACK
-            recvWindow.add(new WindowItem(recvPack));
-            System.out.println("{R}[+] Add to Window");
-            printWindow();
         }
     }
 
