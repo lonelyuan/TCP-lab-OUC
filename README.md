@@ -6,7 +6,7 @@
 
 为实现迭代式开发，所有实验代码均通过Git管理，下面选中了的版本号是在代码仓库中标记了的Git标签。
 
-<img src="D:\Academic\CS\Network\tcp\TCP_Test\assets\git_stat.png" alt="git_stat" style="zoom:50%;" />
+<img src="\..\assets\git_stat.png" alt="git_stat" style="zoom:50%;" />
 
 - 1.0：理想模型——完全可靠信道
 - [x]  2.0：ARQ：自动重传——比特差错
@@ -88,9 +88,9 @@ public class CheckSum {
 
 可以看到超出错后立即进行了重传。
 
-#### ![rdt_v20](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v20.png)
+#### ![rdt_v20](\..\assets\rdt_v20.png)
 
-![rdt_v20_1](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v20_1.png)
+![rdt_v20_1](\..\assets\rdt_v20_1.png)
 
 ### RDT2.2  noNAK
 
@@ -119,9 +119,9 @@ public class CheckSum {
 
 可以看到ACK出错也立即进行重传。
 
-![rdt_v22_1](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v22_1.png)
+![rdt_v22_1](\..\assets\rdt_v22_1.png)
 
-![rdt_v22_11](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v22_11.png)
+![rdt_v22_11](\..\assets\rdt_v22_11.png)
 
 ### RDT3.0 timer
 
@@ -152,13 +152,13 @@ public class CheckSum {
 
 可以看到，丢包3秒后出发了重传。
 
-![rdt_v30_3](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v30_3.png)
+![rdt_v30_3](\..\assets\rdt_v30_3.png)
 
-![rdt_v30_loss](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v30_loss.png)
+![rdt_v30_loss](\..\assets\rdt_v30_loss.png)
 
 同样保持对位错的处理：
 
-![rdt_v30_rdt2](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v30_rdt2.png)
+![rdt_v30_rdt2](\..\assets\rdt_v30_rdt2.png)
 
 ### RDT4.2 SR
 
@@ -289,13 +289,13 @@ recvWindow = new TreeSet<>(Comparator.comparingInt(o -> o.tcpPack.getTcpH().getT
 
 下列案例说明了SR协议可以应对数据报失序。
 
-![rdt_v40_r1](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v40_r1.png)
+![rdt_v40_r1](\..\assets\rdt_v40_r1.png)
 
-![rdt_v40_s1](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v40_s1.png)
+![rdt_v40_s1](\..\assets\rdt_v40_s1.png)
 
-![rdt_v40_s2](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v40_s2.png)
+![rdt_v40_s2](\..\assets\rdt_v40_s2.png)
 
-![rdt_v40_s22](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v40_s22.png)
+![rdt_v40_s22](\..\assets\rdt_v40_s22.png)
 
 ### RDT4.3 TCP
 
@@ -305,7 +305,7 @@ TCP初版的特点是，单计时器+累计确认+选择重传+动态RTT。由�
 
 ##### 单计时器
 
-基于`mainloop()`版本的单计时器实现有一个取巧的方法，每次循环固有一个时间`t`，因此为窗口项添加`reTranscnt`字段，每次循环将未确认项的计数器加一，到达阈值后重传。这样重传时间略大于`t*reTranscnt`。而不需要新计时器线程。参见：TODO
+基于`mainloop()`版本的单计时器实现有一个取巧的方法，每次循环固有一个时间`t`，因此为窗口项添加`reTranscnt`字段，每次循环将未确认项的计数器加一，到达阈值后重传。这样重传时间略大于`t*reTranscnt`。而不需要新计时器线程。参见：
 
 由于后续版本消除了`mainloop()`，因此需要标记待重传的第一个包`nextReSeq`。如果能保证确认一个包就推动窗口，那么下一个要重传的包只会出现在包头，因此`sendBase == nextSeq`成为判别重传的重要标志。
 
@@ -466,23 +466,23 @@ private void calcRTT(long RTT) {
 
 如下图，累计确认可以消除单个ACK丢失的影响。
 
-![rdt_v43_delay_wrong](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v43_delay_wrong.png)
+![rdt_v43_delay_wrong](\..\assets\rdt_v43_delay_wrong.png)
 
 另外，图中包951出现位错，发送方窗口停止推动，发送冗余ACK。
 
-![rdt_v43_error_log](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v43_error_log.png)
+![rdt_v43_error_log](\..\assets\rdt_v43_error_log.png)
 
 在第三个冗余ACK到达时，触发快速重传。
 
-![rdt_v50_wrong3](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v50_wrong3.png)
+![rdt_v50_wrong3](\..\assets\rdt_v50_wrong3.png)
 
 重传成功，发送方累计确认4个包。
 
-![rdt_v50_wrong4](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v50_wrong4.png)
+![rdt_v50_wrong4](\..\assets\rdt_v50_wrong4.png)
 
 同时发送方log：
 
-![rdt_v50_wrong2](D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v50_wrong2.png)
+![rdt_v50_wrong2](\..\assets\rdt_v50_wrong2.png)
 
 ### RDT5.1 Reno
 
@@ -531,15 +531,15 @@ if (cwnd >= ssthresh) { // CA: 加性增
 
 慢增长：
 
-<img src="D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v51_SS.png" alt="rdt_v51_SS" style="zoom:67%;" />
+<img src="\..\assets\rdt_v51_SS.png" alt="rdt_v51_SS" style="zoom:67%;" />
 
 加性增：
 
-<img src="D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v51_CA.png" alt="rdt_v51_CA" style="zoom:67%;" />
+<img src="\..\assets\rdt_v51_CA.png" alt="rdt_v51_CA" style="zoom:67%;" />
 
 乘性减：
 
-<img src="D:\Academic\CS\Network\tcp\TCP_Test\assets\rdt_v51_CA2.png" alt="rdt_v51_CA2" style="zoom:67%;" />
+<img src="\..\assets\rdt_v51_CA2.png" alt="rdt_v51_CA2" style="zoom:67%;" />
 
 由于是本机测试，未出现RTO超时的情况。
 
