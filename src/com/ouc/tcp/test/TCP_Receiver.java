@@ -37,6 +37,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
             pakStat = 2; // 刚加入的包默认为失序未确认态
             pakSeq = pak.getTcpH().getTh_seq();
         }
+
         @Override
         public String toString() {
             return "I{" +
@@ -85,6 +86,12 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
         updateWindow(recvPack);
     }
 
+    /**
+     * 校验包
+     *
+     * @param recvPack 收到的包
+     * @return 是否校验通过
+     */
     private boolean checkPak(TCP_PACKET recvPack) {
         if (CheckSum.computeChkSum(recvPack) != recvPack.getTcpH().getTh_sum()) { // 校验
             System.out.println("{R}[!] check sum failed!");
@@ -92,6 +99,7 @@ public class TCP_Receiver extends TCP_Receiver_ADT {
         }
         return false;
     }
+
     /**
      * 生成ACK报文并返回
      *

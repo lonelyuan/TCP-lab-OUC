@@ -33,7 +33,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
         public void run() {
             System.out.println("{S}[SS] congestion!");
             Stat = CongStat.SS;
-            ReFlag = true;
+            ReFlag = true; // 准备GBN
             ssthresh = cwnd / 2;
             cwnd = 1;
             // 重传一个包，设重传头
@@ -114,7 +114,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
     // RDT5.1 阻塞控制
     private volatile CongStat Stat = CongStat.SS;
     private int cwnd = 1; // 阻塞窗口
-    private int ssthresh = 65536; // 慢启动阈值
+    private int ssthresh = 655; // 慢启动阈值
 
     public TCP_Sender() {
         super();
@@ -134,7 +134,7 @@ public class TCP_Sender extends TCP_Sender_ADT {
         if (sendWindow.size() == 0) return;
         StringBuilder sb = new StringBuilder().append("------ {SendWindow} ------\n");
         sb.append("-- Base: ").append(sendBase).append(" -- Next: ").append(nextSeq)
-                .append("\n-- ").append(Stat).append(" -- CNWD: ").append(cwnd).append(" -- ssthresh: ").append(ssthresh);
+                .append("\n-- ").append(Stat).append(" -- CNWD: ").append(cwnd).append(" -- ssthresh: ").append(ssthresh).append("\n-- ");
         for (WindowItem I : sendWindow) {
             switch (I.pakStat) {
                 case 1:
@@ -232,6 +232,9 @@ public class TCP_Sender extends TCP_Sender_ADT {
         }
     }
 
+    /**
+     * GBN重传
+     */
     private void reSendAll() {
         if (nextReSeq < sendBase) { // 无需重传
             nextReSeq = sendBase;
@@ -251,6 +254,11 @@ public class TCP_Sender extends TCP_Sender_ADT {
         }
     }
 
+    /**
+     * 累计确认窗口
+     *
+     * @param l 窗口滑动量
+     */
     private void slideWin(long l) {
         WindowItem I;
         while (l > 0 && !sendWindow.isEmpty()) {
@@ -262,6 +270,11 @@ public class TCP_Sender extends TCP_Sender_ADT {
         }
     }
 
+    /**
+     * 快速重传
+     *
+     * @param ackSeq ACK号
+     */
     private void checkDupACK(int ackSeq) {
         if (ackSeq == lastACK) {
             dupACK += 1;
@@ -281,8 +294,14 @@ public class TCP_Sender extends TCP_Sender_ADT {
         }
     }
 
+    /**
+     * 校验包
+     *
+     * @param recvPack 收到的包
+     * @return 是否校验通过
+     */
     private boolean checkPak(TCP_PACKET recvPack) {
-        if (CheckSum.computeChkSum(recvPack) != recvPack.getTcpH().getTh_sum()) { // 校验
+        if (CheckSum.computeChkSum(recvPack) != recvPack.getTcpH().getTh_sum()) {
             System.out.println("{S}[!] check sum failed!");
             return true;
         }
